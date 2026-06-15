@@ -11,10 +11,12 @@ describe('resolveSquadRouting', () => {
   it('uses the single override', () => {
     expect(resolveSquadRouting([null, 'ru-split'])).toBe('ru-split');
     expect(resolveSquadRouting(['proxy-all'])).toBe('proxy-all');
+    expect(resolveSquadRouting(['roscomvpn'])).toBe('roscomvpn');
   });
 
   it('dedupes identical overrides', () => {
     expect(resolveSquadRouting(['ru-split', 'ru-split', null])).toBe('ru-split');
+    expect(resolveSquadRouting(['roscomvpn', null, 'roscomvpn'])).toBe('roscomvpn');
   });
 
   it('falls back to null on conflicting overrides', () => {

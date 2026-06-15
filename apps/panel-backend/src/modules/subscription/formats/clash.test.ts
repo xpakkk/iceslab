@@ -42,6 +42,32 @@ const ssEp: SubscriptionEndpoint = {
   uri: 'ss://...',
 };
 
+const mieruEp: SubscriptionEndpoint = {
+  protocol: 'mieru',
+  nodeName: 'eu-1',
+  host: 'm1.example.com',
+  port: 8443,
+  username: 'alice',
+  password: 'pa:ss#word',
+  mtu: 1400,
+  uri: 'mieru://...',
+};
+
+function extractRuleProviderNames(config: string): Set<string> {
+  const start = config.indexOf('rule-providers:');
+  const end = config.indexOf('\nrules:');
+  if (start < 0 || end < 0) return new Set();
+  const block = config.slice(start, end);
+  return new Set([...block.matchAll(/^  ([A-Za-z0-9-]+):$/gm)].map((m) => m[1]));
+}
+
+function extractRuleSetReferences(config: string): Set<string> {
+  return new Set([
+    ...[...config.matchAll(/RULE-SET,([^,\n]+)/g)].map((m) => m[1]),
+    ...[...config.matchAll(/rule-set:([A-Za-z0-9-]+)/g)].map((m) => m[1]),
+  ]);
+}
+
 describe('buildClashYaml', () => {
   it('emits a hysteria2 proxy entry with mandatory fields', () => {
     const out = buildClashYaml([hysteriaEp]);
@@ -165,6 +191,19 @@ describe('buildClashYaml', () => {
     expect(out).toMatch(/- eu-1-shadowsocks/);
   });
 
+  it('emits a mieru proxy entry with separate username and password fields', () => {
+    const out = buildClashYaml([mieruEp]);
+    expect(out).toContain('- name: alice-eu-1-mieru');
+    expect(out).toContain('type: mieru');
+    expect(out).toContain('server: m1.example.com');
+    expect(out).toContain('port: 8443');
+    expect(out).toContain('transport: TCP');
+    expect(out).toContain('udp: true');
+    expect(out).toContain('username: alice');
+    expect(out).toContain('password: "pa:ss#word"');
+    expect(out).toContain('multiplexing: MULTIPLEXING_LOW');
+  });
+
   // ───── Slice 24c part 2 — transports ─────
 
   it('emits ws-opts with path + Host header for ws network', () => {
@@ -205,14 +244,15 @@ describe('buildClashYaml', () => {
   // ───── Routing Templates (R1c) ─────
 
   describe('routingPreset', () => {
-    it('default proxy-all output is byte-identical to pre-R1 (no geo block, no preset rules)', () => {
+    it('default proxy-all output is byte-identical to explicit proxy-all', () => {
       expect(buildClashYaml([xrayEp], { routingPreset: 'proxy-all' })).toBe(
         buildClashYaml([xrayEp]),
       );
       const out = buildClashYaml([xrayEp]);
       expect(out).not.toContain('GEOSITE');
       expect(out).not.toContain('geox-url');
-      expect(out.startsWith('proxies:')).toBe(true);
+      expect(out).toContain('dns:');
+      expect(out.indexOf('dns:')).toBeLessThan(out.indexOf('proxies:'));
     });
 
     it('ru-split emits geo block with jsdelivr mirrors and auto-update', () => {
@@ -250,9 +290,19 @@ describe('buildClashYaml', () => {
       expect(out.trimEnd().endsWith('- MATCH,DIRECT')).toBe(true);
     });
 
-    it('ru-split emits split-DNS block (R2); proxy-all does not', () => {
-      expect(buildClashYaml([xrayEp])).not.toContain('dns:');
+    it('proxy-all emits DNS with proxied DoH for TUN clients', () => {
+      const out = buildClashYaml([xrayEp]);
+      expect(out).toContain('mode: rule');
+      expect(out).toContain('ipv6: false');
+      expect(out).toContain('dns:');
+      expect(out).toContain('  listen: 0.0.0.0:1053');
+      expect(out).toContain('  enhanced-mode: redir-host');
+      expect(out).toContain('    - https://1.1.1.1/dns-query#Auto');
+      expect(out).toContain('    - https://8.8.8.8/dns-query#Auto');
+      expect(out).not.toContain('rule-providers:');
+    });
 
+    it('ru-split emits split-DNS block (R2)', () => {
       const out = buildClashYaml([xrayEp], { routingPreset: 'ru-split' });
       expect(out).toContain('dns:');
       expect(out).toContain('  enable: true');
@@ -268,6 +318,48 @@ describe('buildClashYaml', () => {
       // DNS block sits before proxies, after the geo block.
       expect(out.indexOf('dns:')).toBeGreaterThan(out.indexOf('geox-url:'));
       expect(out.indexOf('dns:')).toBeLessThan(out.indexOf('proxies:'));
+    });
+
+    it('roscomvpn emits updating Mihomo rule-providers and routes blocked sites via Auto', () => {
+      const out = buildClashYaml([xrayEp], { routingPreset: 'roscomvpn' });
+
+      expect(out).toContain('rule-providers:');
+      expect(out).toContain(
+        'url: https://cdn.jsdelivr.net/gh/hydraponique/roscomvpn-geosite/release/mihomo/youtube.mrs',
+      );
+      expect(out).toContain(
+        'url: https://cdn.jsdelivr.net/gh/hydraponique/roscomvpn-geoip/release/mihomo/direct.mrs',
+      );
+      expect(out).toContain('interval: 86400');
+      expect(out).toContain('  - AND,((NETWORK,UDP),(DST-PORT,443)),REJECT');
+      expect(out).toContain('  - RULE-SET,youtube,Auto');
+      expect(out).toContain('  - RULE-SET,telegram,Auto');
+      expect(out).toContain('  - RULE-SET,category-ru,DIRECT');
+      expect(out.trimEnd().endsWith('- MATCH,Auto')).toBe(true);
+      expect(out.indexOf('rule-providers:')).toBeLessThan(out.indexOf('rules:'));
+    });
+
+    it('roscomvpn keeps rule-set and Auto references internally consistent', () => {
+      const out = buildClashYaml([xrayEp], { routingPreset: 'roscomvpn' });
+      const providerNames = extractRuleProviderNames(out);
+      const ruleSetReferences = extractRuleSetReferences(out);
+
+      expect(providerNames.size).toBeGreaterThan(0);
+      expect(ruleSetReferences.size).toBeGreaterThan(0);
+      expect([...ruleSetReferences].filter((name) => !providerNames.has(name))).toEqual([]);
+      expect(out).toContain('- name: Auto');
+      expect(out).toContain('proxy: Auto');
+      expect(out).toContain('#Auto');
+    });
+
+    it('roscomvpn with no proxies omits remote rule-providers and keeps MATCH,DIRECT', () => {
+      const out = buildClashYaml([], { routingPreset: 'roscomvpn' });
+
+      expect(out).not.toContain('rule-providers:');
+      expect(out).not.toContain('RULE-SET');
+      expect(out).not.toContain('proxy: Auto');
+      expect(out).not.toContain('#Auto');
+      expect(out.trimEnd().endsWith('- MATCH,DIRECT')).toBe(true);
     });
   });
 });

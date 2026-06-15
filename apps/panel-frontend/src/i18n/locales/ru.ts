@@ -518,6 +518,7 @@ export default {
       routingInherit: 'Наследовать (дефолт панели)',
       routingProxyAll: 'Проксировать всё',
       routingRuSplit: 'RU split (ru-split)',
+      routingRoscomVpn: 'RoscomVPN smart split (Mihomo)',
       hwidLimit: 'Лимит устройств HWID (дефолт сквада)',
       hwidLimitDesc: 'Дефолтный лимит устройств для членов без своего лимита. Пусто = нет. По сквадам выигрывает самый щедрый (max).',
       hwidLimitPlaceholder: 'Нет дефолта сквада',
@@ -599,12 +600,15 @@ export default {
       saved: 'Метаданные подписки обновлены',
       routingTitle: 'Маршрутизация',
       routingDesc:
-        'Правила трафика в форматах полного конфига (Clash / sing-box / Xray JSON). URI-форматы правил не несут.',
+        'Правила трафика в форматах полного конфига. RoscomVPN выдаётся для Mihomo/Clash; остальные форматы откатываются к proxy-all.',
       routingProxyAll: 'Всё через туннель',
       routingProxyAllDesc: 'Весь трафик идёт через прокси. Поведение по умолчанию.',
       routingRuSplit: 'Умный сплит для РФ',
       routingRuSplitDesc:
         'Реклама и малварь в блок, российские сайты и локальные адреса напрямую, остальное через туннель.',
+      routingRoscomVpn: 'RoscomVPN smart split (Mihomo)',
+      routingRoscomVpnDesc:
+        'Обновляемые списки RoscomVPN для Mihomo/Clash: российские и локальные ресурсы напрямую, Telegram/YouTube/GitHub/остальное через туннель.',
       routingSaved: 'Пресет маршрутизации обновлён',
       customRulesTitle: 'Кастомные правила маршрутизации (про)',
       customRulesDesc:

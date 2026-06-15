@@ -236,6 +236,12 @@ describe('buildSingboxJson', () => {
       expect(cfg.route.rule_set).toBeUndefined();
     });
 
+    it('roscomvpn falls back to proxy-all until sing-box rule-set parity exists', () => {
+      expect(buildSingboxJson([xrayEp], { routingPreset: 'roscomvpn' })).toBe(
+        buildSingboxJson([xrayEp], { routingPreset: 'proxy-all' }),
+      );
+    });
+
     it('ru-split emits four remote binary rule-sets without download_detour', () => {
       const cfg = parse(buildSingboxJson([xrayEp], { routingPreset: 'ru-split' }));
       const sets = cfg.route.rule_set;

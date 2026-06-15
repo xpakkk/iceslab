@@ -102,7 +102,10 @@ export function buildXrayJson(
   const xrayEps = endpoints.filter((e) => e.protocol === 'xray');
   const proxyTags: string[] = [];
   const bundle = opts.bundle ?? 'flat';
-  const ruSplit = (opts.routingPreset ?? 'proxy-all') === 'ru-split';
+  const routingPreset = opts.routingPreset ?? 'proxy-all';
+  // RoscomVPN is Mihomo/Clash-only for now; xrayjson keeps proxy-all until a
+  // format-native .dat/geosite parity path is implemented and tested.
+  const ruSplit = routingPreset === 'ru-split';
 
   const proxyOutbounds = xrayEps.map((e) => {
     if (e.protocol !== 'xray') throw new Error('unreachable'); // narrowing

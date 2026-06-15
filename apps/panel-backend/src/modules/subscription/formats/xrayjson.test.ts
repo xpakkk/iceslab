@@ -136,6 +136,12 @@ describe('buildXrayJson', () => {
       expect(JSON.stringify(cfg.routing.rules)).not.toContain('geosite');
     });
 
+    it('roscomvpn falls back to proxy-all until xray rule-set parity exists', () => {
+      expect(buildXrayJson([xrayEp], { routingPreset: 'roscomvpn' })).toBe(
+        buildXrayJson([xrayEp], { routingPreset: 'proxy-all' }),
+      );
+    });
+
     it('ru-split prepends block/direct rules ahead of the catch-all', () => {
       const cfg = parse(buildXrayJson([xrayEp], { routingPreset: 'ru-split' }));
       const rules = cfg.routing.rules;

@@ -39,6 +39,7 @@ import {
   type UpdateSquadInput,
 } from '../lib/api';
 import { protocolLabelCompact } from '../lib/protocols';
+import { routingPresetSelectOptions } from '../lib/routingPresets';
 
 const PROTOCOL_COLORS: Record<string, string> = {
   hysteria: 'blue',
@@ -93,6 +94,7 @@ export function SquadFormModal({
   loading,
 }: Props) {
   const { t } = useTranslation();
+  const routingOptions = routingPresetSelectOptions(t);
   const isEdit = squad !== null;
   const isAllSquad = squad?.id === ALL_SQUAD_ID;
   const [search, setSearch] = useState('');
@@ -310,11 +312,7 @@ export function SquadFormModal({
             label={t('squads.form.routing')}
             description={t('squads.form.routingDesc')}
             disabled={isAllSquad}
-            data={[
-              { value: '', label: t('squads.form.routingInherit') },
-              { value: 'proxy-all', label: t('squads.form.routingProxyAll') },
-              { value: 'ru-split', label: t('squads.form.routingRuSplit') },
-            ]}
+            data={routingOptions}
             allowDeselect={false}
             {...form.getInputProps('routingPreset')}
           />

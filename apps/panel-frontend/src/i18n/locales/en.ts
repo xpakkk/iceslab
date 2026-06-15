@@ -513,6 +513,7 @@ export default {
       routingInherit: 'Inherit (panel default)',
       routingProxyAll: 'Proxy all',
       routingRuSplit: 'RU split (ru-split)',
+      routingRoscomVpn: 'RoscomVPN smart split (Mihomo)',
       hwidLimit: 'HWID device limit (squad default)',
       hwidLimitDesc: 'Default device cap for members without their own limit. Empty = none. Across squads the most-permissive (max) wins.',
       hwidLimitPlaceholder: 'No squad default',
@@ -594,12 +595,15 @@ export default {
       saved: 'Subscription metadata updated',
       routingTitle: 'Routing',
       routingDesc:
-        'Traffic rules embedded into full-config formats (Clash / sing-box / Xray JSON). URI-list formats carry no routing.',
+        'Traffic rules embedded into full-config formats. RoscomVPN rules are emitted for Mihomo/Clash; other formats fall back to proxy-all.',
       routingProxyAll: 'Everything through the tunnel',
       routingProxyAllDesc: 'All traffic rides the proxy. Default behaviour.',
       routingRuSplit: 'Smart RU split',
       routingRuSplitDesc:
         'Ads and malware blocked, Russian sites and private ranges go direct, everything else through the tunnel.',
+      routingRoscomVpn: 'RoscomVPN smart split (Mihomo)',
+      routingRoscomVpnDesc:
+        'Updating RoscomVPN rule sets for Mihomo/Clash: Russian and local resources direct, Telegram/YouTube/GitHub/everything else through the tunnel.',
       routingSaved: 'Routing preset updated',
       customRulesTitle: 'Custom routing rules (advanced)',
       customRulesDesc:

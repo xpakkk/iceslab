@@ -27,10 +27,12 @@ import { invalidateSubscriptionSettingsCache } from './settings.service.js';
  *   - `subscriptionAnnounceTemplate` (string)     — Announce header template,
  *                                                   placeholders: {{TRAFFIC_LEFT}},
  *                                                   {{DAYS_LEFT}}, {{SUPPORT_URL}}
- *   - `subscriptionRoutingPreset` (enum, R1a)     - routing rules emitted into
- *                                                   clash/singbox/xrayjson:
- *                                                   'proxy-all' (default) |
- *                                                   'ru-split'
+  *   - `subscriptionRoutingPreset` (enum, R1a)     - routing rules emitted into
+  *                                                   full-config formats:
+  *                                                   'proxy-all' (default) |
+  *                                                   'ru-split' | 'roscomvpn'
+  *                                                   (roscomvpn is Mihomo/Clash
+  *                                                   only for now)
  *
  * Future keys land in the same table; flip `isPublic` per key.
  */

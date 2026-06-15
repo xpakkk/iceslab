@@ -110,7 +110,10 @@ export function buildSingboxJson(
 ): string {
   const outbounds: Record<string, unknown>[] = [];
   const proxyTags: string[] = [];
-  const ruSplit = (opts.routingPreset ?? 'proxy-all') === 'ru-split';
+  const routingPreset = opts.routingPreset ?? 'proxy-all';
+  // RoscomVPN is Mihomo/Clash-only for now; sing-box keeps proxy-all until a
+  // format-native .srs rule-set matrix is implemented and tested.
+  const ruSplit = routingPreset === 'ru-split';
 
   for (const e of endpoints) {
     const tag = `${e.nodeName}-${e.protocol}`;

@@ -1,5 +1,6 @@
 import type { RoutingPresetId } from '@iceslab/shared';
 import type { SubscriptionEndpoint } from '../subscription.formats.js';
+import { buildClashRoutingSections } from './clash.routing.js';
 
 /**
  * Clash YAML subscription formatter (targets Clash Meta / Mihomo — covers
@@ -10,6 +11,7 @@ import type { SubscriptionEndpoint } from '../subscription.formats.js';
  *   - xray (VLESS+REALITY)  → `type: vless` with `reality-opts`
  *   - xray (Trojan+REALITY) → `type: trojan` with `reality-opts` (slice 24c part 3a)
  *   - shadowsocks           → `type: ss` with cipher + password (slice 24d)
+ *   - mieru                 → `type: mieru` with username + password
  *   - amneziawg / naive are NOT emitted: classic Clash has no native support
  *     and Clash Meta's experimental wireguard/naive support diverges per
  *     fork. AmneziaWG users get the wg-quick `.conf` format; Naive users
@@ -45,7 +47,8 @@ function yamlString(value: string): string {
  *     it is the fallback that may resolve a domain that missed every GEOSITE
  *     rule before deciding tunnel-vs-direct.
  *
- * Default 'proxy-all' keeps the output byte-identical to pre-R1 builds.
+ * Default 'proxy-all' emits an explicit DNS block for TUN clients while keeping
+ * routing itself as MATCH -> Auto.
  */
 export interface ClashBuildOpts {
   routingPreset?: RoutingPresetId;
@@ -61,58 +64,11 @@ const RU_SPLIT_GEO_LINES: readonly string[] = [
   '',
 ];
 
-/**
- * Split DNS (R2). fake-ip keeps app-side resolution instant; RU domains are
- * answered by Yandex DNS (77.88.8.8) via nameserver-policy so RU CDNs return
- * geo-correct IPs, everything else goes to DoH. `default-nameserver` and
- * `proxy-server-nameserver` are plain IPs: they bootstrap the DoH hostnames
- * and resolve the proxy node addresses without a chicken-and-egg loop.
- * NOTE: mihomo sends DNS directly (not through the tunnel) by default; DoH
- * keeps those queries encrypted on the wire.
- */
-const RU_SPLIT_DNS_LINES: readonly string[] = [
-  'dns:',
-  '  enable: true',
-  '  enhanced-mode: fake-ip',
-  '  fake-ip-range: 198.18.0.1/16',
-  '  fake-ip-filter:',
-  '    - "*.lan"',
-  '    - "+.local"',
-  '  default-nameserver:',
-  '    - 77.88.8.8',
-  '    - 1.1.1.1',
-  '  proxy-server-nameserver:',
-  '    - 77.88.8.8',
-  '    - 1.1.1.1',
-  '  nameserver:',
-  '    - https://1.1.1.1/dns-query',
-  '    - https://dns.google/dns-query',
-  '  nameserver-policy:',
-  '    "geosite:category-ru": 77.88.8.8',
-  '    "geosite:category-gov-ru": 77.88.8.8',
-  '',
-];
-
-const RU_SPLIT_RULE_LINES: readonly string[] = [
-  '  - GEOSITE,category-ads-all,REJECT',
-  '  - GEOSITE,category-ru,DIRECT',
-  '  - GEOSITE,category-gov-ru,DIRECT',
-  '  - IP-CIDR,10.0.0.0/8,DIRECT,no-resolve',
-  '  - IP-CIDR,172.16.0.0/12,DIRECT,no-resolve',
-  '  - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve',
-  '  - IP-CIDR,127.0.0.0/8,DIRECT,no-resolve',
-  '  - IP-CIDR,169.254.0.0/16,DIRECT,no-resolve',
-  '  - IP-CIDR6,fc00::/7,DIRECT,no-resolve',
-  '  - IP-CIDR6,fe80::/10,DIRECT,no-resolve',
-  '  - IP-CIDR6,::1/128,DIRECT,no-resolve',
-  '  - GEOIP,RU,DIRECT',
-];
-
 export function buildClashYaml(
   endpoints: SubscriptionEndpoint[],
   buildOpts: ClashBuildOpts = {},
 ): string {
-  const ruSplit = (buildOpts.routingPreset ?? 'proxy-all') === 'ru-split';
+  const routingPreset = buildOpts.routingPreset ?? 'proxy-all';
   const proxies: string[] = [];
   const proxyNames: string[] = [];
 
@@ -234,14 +190,32 @@ export function buildClashYaml(
           `    udp: true`,
         ].join('\n'),
       );
+    } else if (e.protocol === 'mieru') {
+      const mieruName = `${e.username}-${name}`;
+      proxyNames.push(mieruName);
+      proxies.push(
+        [
+          `  - name: ${yamlString(mieruName)}`,
+          `    type: mieru`,
+          `    server: ${e.host}`,
+          `    port: ${e.port}`,
+          `    transport: TCP`,
+          `    udp: true`,
+          `    username: ${yamlString(e.username)}`,
+          `    password: ${yamlString(e.password)}`,
+          `    multiplexing: MULTIPLEXING_LOW`,
+        ].join('\n'),
+      );
     }
   }
 
+  const hasProxyGroup = proxyNames.length > 0;
+  const routing = buildClashRoutingSections(routingPreset, hasProxyGroup);
   const lines: string[] = [];
-  if (ruSplit) {
+  if (routingPreset === 'ru-split') {
     lines.push(...RU_SPLIT_GEO_LINES);
-    lines.push(...RU_SPLIT_DNS_LINES);
   }
+  lines.push(...routing.headerLines);
   lines.push('proxies:');
   if (proxies.length === 0) {
     lines.push('  []');
@@ -265,10 +239,13 @@ export function buildClashYaml(
   }
   lines.push('');
 
-  lines.push('rules:');
-  if (ruSplit) {
-    lines.push(...RU_SPLIT_RULE_LINES);
+  if (routing.ruleProviderLines.length > 0) {
+    lines.push(...routing.ruleProviderLines);
+    lines.push('');
   }
+
+  lines.push('rules:');
+  lines.push(...routing.ruleLines);
   lines.push(proxyNames.length > 0 ? '  - MATCH,Auto' : '  - MATCH,DIRECT');
 
   return lines.join('\n') + '\n';
